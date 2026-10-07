@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="지금 날씨와 기온에 맞는 옷차림을 알려주는 weathering">
+<meta name="theme-color" content="#fdfbfb">
+<meta name="color-scheme" content="light only">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="weathering">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>weathering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout: a calm white app column — gothic wordmark with a city switcher, pill tabs,
+   a living weather scene, then thin-framed panels; flat muted blush, no gradients outside the scene. */
+:root{
+  --bg:#fdfbfb;
+  --surface:#ffffff;
+  --blush:#f8f4f5;
+  --blush-2:#f0e8ea;
+  --rose:#d3bfc4;
+  --accent:#a98892;
+  --ink:#4a4346;
+  --muted:#a0979a;
+  --line:#efe9ea;
+  --on-accent:#ffffff;
+  --up:#b07c6a;
+  --down:#6f88a3;
+  --shadow:0 8px 24px -18px rgba(120,95,102,.35);
+  --lv1:#f2e1e3;--lv2:#f4ebe9;--lv3:#eeebf0;--lv4:#e5eaf0;--lv5:#dbe3ec;
+  --f-body:"Gothic A1","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;letter-spacing:-.01em}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:20px 64px;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{margin:0;font-weight:500;text-wrap:balance}
+p{margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:12px}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:relative}
+.brand{font-size:30px;line-height:1.1;color:var(--accent);font-weight:700;letter-spacing:-.04em}
+.loc-btn{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);cursor:pointer;max-width:100%}
+.loc-btn .ic{width:30px;height:30px;flex:0 0 auto}
+.loc-btn b{font-weight:500;font-size:17px}
+.loc-btn span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc-btn .chev{width:12px;height:12px;flex:0 0 auto;color:var(--muted)}
+
+.picker{position:absolute;right:0;top:calc(100% + 8px);z-index:20;width:min(360px,100%);background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 40px -20px rgba(80,60,66,.45);padding:14px;display:flex;flex-direction:column;gap:10px}
+.search{display:flex;align-items:center;gap:8px;background:var(--blush);border-radius:999px;padding:8px 14px}
+.search svg{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
+.search input{flex:1;min-width:0;border:0;background:none;padding:2px 0}
+.search input:focus{outline:none}
+.list{max-height:330px;overflow-y:auto;display:flex;flex-direction:column}
+.grp{font-size:11px;letter-spacing:.08em;color:var(--rose);font-weight:600;padding:10px 8px 4px}
+.city{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border:0;background:none;border-radius:12px;cursor:pointer;text-align:left;width:100%}
+.city:hover{background:var(--blush)}
+.city[aria-selected="true"]{background:var(--blush-2);font-weight:500}
+.city small{font-size:12px;color:var(--muted)}
+.empty{font-size:13px;color:var(--muted);padding:10px 8px}
+.chip .x{margin-left:6px;color:var(--muted)}
+.banner{background:var(--blush-2);border-radius:18px;padding:14px 16px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.banner b{font-weight:600}
+.skeleton{color:var(--muted);font-size:13px;padding:8px 0}
+.live{display:inline-flex;align-items:center;gap:6px}
+.live i{width:7px;height:7px;border-radius:50%;background:#8fb49a;display:inline-block}
+.stale i{background:var(--rose)}
+.recent{display:flex;gap:6px;flex-wrap:wrap}
+.recent.gu{padding:8px;background:var(--blush);border-radius:14px}
+.recent.gu:empty{display:none}
+.picker{max-height:min(560px,80vh);overflow-y:auto}
+.picker > *{flex-shrink:0}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab,.chip{border:1px solid var(--line);background:var(--surface);padding:8px 18px;border-radius:999px;cursor:pointer;font-size:14px;color:var(--muted)}
+.chip{padding:5px 12px;font-size:12px}
+.tab[aria-selected="true"]{background:var(--blush-2);color:var(--ink);border-color:transparent;font-weight:500}
+.tab:hover,.chip:hover{color:var(--ink)}
+
+.note{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--blush);font-size:12px;color:var(--accent)}
+
+.panel{position:relative;background:var(--surface);border-radius:28px;padding:22px;border:1px solid var(--line);min-width:0}
+.panel.frame::before{content:"";position:absolute;inset:7px;border:1px solid var(--line);border-radius:22px;pointer-events:none}
+.panel-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.panel-h h2{font-size:18px}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--rose);font-weight:500}
+@media (max-width:520px){.panel{padding:18px 14px}}
+
+.grid-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px}
+@media (max-width:820px){.grid-2{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+/* hero */
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding-block:26px}
+.place{font-size:13px;color:var(--muted)}
+.place b{color:var(--ink);font-weight:500}
+.scene{width:100%;aspect-ratio:16/10;max-width:100%;border-radius:22px;overflow:hidden;position:relative}
+.scene canvas{display:block;width:100%;height:100%}
+.scene .tag{position:absolute;left:14px;bottom:12px;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.88);color:#5d5357}
+.temp-big{font-size:64px;font-weight:300;line-height:1;letter-spacing:-.04em}
+.temp-big sup{font-size:26px;vertical-align:top;margin-left:2px}
+.cond{font-size:16px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%}
+.stat{background:var(--blush);border-radius:16px;padding:10px 6px;display:flex;flex-direction:column;gap:2px}
+.stat span{font-size:11px;color:var(--muted)}
+.stat b{font-weight:500;font-size:15px}
+
+.hourly{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.hour{flex:0 0 auto;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:18px;border:1px solid var(--line);font-size:12px}
+.hour.now{background:var(--blush-2);border-color:transparent}
+.hour .ic{width:26px;height:26px}
+.hour b{font-size:15px;font-weight:500}
+
+.week{display:flex;flex-direction:column}
+.day{display:grid;grid-template-columns:70px 30px minmax(0,1fr) 46px;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;cursor:pointer;border:0;background:none;text-align:left;width:100%}
+.day:hover{background:var(--blush)}
+.day[aria-pressed="true"]{background:var(--blush-2)}
+.day .ic{width:26px;height:26px}
+.range{position:relative;height:6px;border-radius:6px;background:var(--line)}
+.range i{position:absolute;top:0;bottom:0;border-radius:6px;background:var(--rose)}
+.day .t{display:flex;justify-content:space-between;font-size:13px}
+.day .pp{font-size:11px;color:var(--down);text-align:right}
+
+/* yesterday */
+.y-top{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+.y-top .ic{width:40px;height:40px}
+.y-top b{font-weight:500;font-size:16px;display:block}
+.y-top small{font-size:12px;color:var(--muted)}
+.y-temp{font-size:20px;font-weight:500;text-align:right}
+.y-temp span{font-size:14px;color:var(--muted);margin-right:4px}
+.y-cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.y-cmp div{background:var(--blush);border-radius:14px;padding:10px 8px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.y-cmp span{font-size:11px;color:var(--muted)}
+.y-cmp b{font-size:15px;font-weight:600}
+.up{color:var(--up)}
+.down{color:var(--down)}
+.y-hours{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.y-hours div{flex:0 0 auto;min-width:52px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);padding:8px 4px;border-radius:14px;border:1px solid var(--line)}
+.y-hours .ic{width:22px;height:22px}
+.y-hours b{font-size:13px;font-weight:500;color:var(--ink)}
+.y-tip{font-size:13px;background:var(--blush-2);border-radius:14px;padding:11px 14px}
+
+/* layers meter */
+.thick{display:flex;flex-direction:column;gap:18px}
+.t-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}
+.t-num{width:76px;height:76px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.t-num b{font-size:32px;font-weight:700}
+.t-num span{font-size:11px;margin-top:4px;opacity:.85}
+.t-name{font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.2}
+.t-desc{font-size:13px;color:var(--muted)}
+.t-meter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;position:relative;padding-top:30px}
+.t-seg{height:10px;border-radius:10px}
+.t-pin{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;white-space:nowrap;transition:left .4s}
+.t-pin span{background:var(--ink);color:var(--surface);padding:2px 8px;border-radius:999px}
+.t-pin i{width:2px;height:8px;background:var(--ink);border-radius:2px}
+.t-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:16px;text-align:center;color:var(--muted);min-width:0}
+.t-tile svg{width:34px;height:34px}
+.t-tile b{font-size:13px;font-weight:600;color:var(--ink)}
+.t-tile small{font-size:10px}
+.t-tile.on{background:var(--accent);color:var(--on-accent);transform:translateY(-2px);box-shadow:var(--shadow)}
+.t-tile.on b{color:var(--on-accent)}
+.t-note{background:var(--blush);border-radius:14px;padding:12px 14px;font-size:13px}
+@media (max-width:420px){.t-tile svg{width:26px;height:26px}.t-tile b{font-size:12px}.t-tile small{display:none}}
+
+/* clothing chart */
+.bands{display:flex;flex-direction:column}
+.band{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;padding:12px 10px;border-top:1px solid var(--line)}
+.band:first-child{border-top:0}
+.band.cur{background:var(--blush);border-radius:14px;border-top-color:transparent}
+.band.cur + .band{border-top-color:transparent}
+.band > b{font-size:13px;font-weight:500;color:var(--muted);padding-top:1px}
+.band.cur > b{color:var(--accent)}
+.band-rows{display:flex;flex-direction:column;gap:4px;min-width:0}
+.band-rows > div{display:grid;grid-template-columns:30px minmax(0,1fr);gap:6px;font-size:13px}
+.band-rows .k{font-size:11px;color:var(--rose);font-weight:600;padding-top:2px}
+.wear{display:flex;flex-wrap:wrap;gap:2px 12px}
+@media (max-width:420px){.band{grid-template-columns:58px minmax(0,1fr);gap:8px;padding:12px 6px}}
+
+/* app shell: one screen per tab, bottom tab bar */
+.wrap{max-width:520px;padding-block:16px calc(92px + env(safe-area-inset-bottom,0px));gap:16px}
+.screens{display:block}
+.screen{display:flex;flex-direction:column;gap:16px}
+.screen[hidden]{display:none}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar .inner{display:flex;width:100%;max-width:520px}
+.tabbar{gap:8px}
+.tb{flex:0 1 160px;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:6px 2px;border-radius:14px;cursor:pointer;color:var(--muted);font-size:11px;max-width:104px}
+.tb svg{width:24px;height:24px}
+.tb[aria-selected="true"]{color:var(--accent);font-weight:600}
+.tb[aria-selected="true"] svg{stroke-width:2}
+.tb:hover{color:var(--ink)}
+.hour .pp{font-size:10px;color:var(--down);min-height:1em}
+.credit{font-size:11px;color:var(--muted);text-align:center;margin:0}.credit a{color:inherit}
+.band-rows > div{grid-template-columns:30px minmax(0,1fr)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand">weathering</h1>
+    <button class="loc-btn" id="locBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="picker"></button>
+    <div class="picker" id="picker" hidden>
+      <form class="search" id="searchForm"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/></svg><input id="q" placeholder="구·시 이름으로 검색 (예: 노원구, 해운대)" autocomplete="off" aria-label="지역 검색"></form>
+      <div class="list" id="list" role="listbox" aria-label="검색 결과"></div>
+      <div class="grp">저장한 지역</div>
+      <div class="recent" id="recent"></div>
+      <div class="grp">국내 지역 고르기</div>
+      <div class="recent" id="sido"></div>
+      <div class="recent gu" id="gu"></div>
+      <div class="grp">해외</div>
+      <div class="recent" id="quick"></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <main class="screens">
+  <section id="view-now" class="screen">
+    <div class="panel frame hero">
+      <p class="place" id="place"></p>
+      <div class="scene"><canvas id="sky" aria-label="현재 날씨 그림"></canvas><span class="tag" id="sceneTag"></span></div>
+      <div class="temp-big num" id="heroTemp"></div>
+      <p class="cond" id="heroCond"></p>
+      <div class="stats" id="heroStats"></div>
+      <p class="note" id="status"></p>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>시간별 날씨</h2><span class="eyebrow">Hourly</span></div>
+      <div class="hourly" id="hourly"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>이번 주</h2><span class="muted" style="font-size:12px">날짜를 누르면 그날 옷차림을 볼 수 있어요</span></div>
+      <div class="week" id="week"></div>
+    </div>
+    <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel-h" style="margin-bottom:0"><h2>어제 날씨 보기</h2><span class="eyebrow">Yesterday</span></div>
+      <div id="yday" style="display:flex;flex-direction:column;gap:14px"></div>
+    </div>
+  </section>
+
+  <section id="view-cody" class="screen" hidden>
+    <div class="panel frame thick">
+      <div class="panel-h" style="margin-bottom:0"><h2>오늘의 두께감</h2><span class="eyebrow">Layers</span></div>
+      <div class="t-head" id="tHead"></div>
+      <div class="t-meter" id="tMeter"></div>
+      <div class="t-note" id="tNote"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>기온별 옷차림</h2><span class="muted" style="font-size:12px" id="chartBasis"></span></div>
+      <div class="bands" id="chart"></div>
+    </div>
+  </section>
+  </main>
+
+  <p class="credit">날씨 데이터 <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)</p>
+
+  <nav class="tabbar" role="tablist" aria-label="메뉴">
+    <button class="tb" role="tab" id="tab-now" data-tab="now" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg><span>날씨</span></button>
+    <button class="tb" role="tab" id="tab-cody" data-tab="cody" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4l-5 3 2 4 2-1v10h8V10l2 1 2-4-5-3q-3 3-6 0z"/></svg><span>옷차림</span></button>
+  </nav>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+// Korean districts (시·구·군): [시도, 구/시, 위도, 경도]
+const KR=[["서울","강남구",37.517,127.047],["서울","강동구",37.530,127.124],["서울","강북구",37.640,127.011],["서울","강서구",37.551,126.850],["서울","관악구",37.478,126.951],["서울","광진구",37.538,127.082],["서울","구로구",37.495,126.887],["서울","금천구",37.457,126.896],["서울","노원구",37.654,127.056],["서울","도봉구",37.669,127.047],["서울","동대문구",37.574,127.040],["서울","동작구",37.512,126.939],["서울","마포구",37.566,126.902],["서울","서대문구",37.579,126.937],["서울","서초구",37.484,127.033],["서울","성동구",37.563,127.037],["서울","성북구",37.589,127.017],["서울","송파구",37.515,127.106],["서울","양천구",37.517,126.867],["서울","영등포구",37.526,126.896],["서울","용산구",37.532,126.990],["서울","은평구",37.603,126.929],["서울","종로구",37.573,126.979],["서울","중구",37.564,126.998],["서울","중랑구",37.606,127.093],["부산","강서구",35.212,128.981],["부산","금정구",35.243,129.092],["부산","기장군",35.245,129.222],["부산","남구",35.136,129.084],["부산","동구",35.129,129.045],["부산","동래구",35.205,129.084],["부산","부산진구",35.163,129.053],["부산","북구",35.197,129.013],["부산","사상구",35.153,128.991],["부산","사하구",35.104,128.975],["부산","서구",35.098,129.024],["부산","수영구",35.146,129.113],["부산","연제구",35.176,129.080],["부산","영도구",35.091,129.068],["부산","중구",35.106,129.032],["부산","해운대구",35.163,129.164],["대구","군위군",36.239,128.573],["대구","남구",35.846,128.597],["대구","달서구",35.830,128.533],["대구","달성군",35.775,128.431],["대구","동구",35.887,128.636],["대구","북구",35.886,128.583],["대구","서구",35.872,128.559],["대구","수성구",35.858,128.631],["대구","중구",35.869,128.606],["인천","강화군",37.747,126.488],["인천","계양구",37.537,126.738],["인천","남동구",37.447,126.731],["인천","동구",37.474,126.643],["인천","미추홀구",37.464,126.650],["인천","부평구",37.507,126.722],["인천","서구",37.545,126.676],["인천","연수구",37.410,126.678],["인천","옹진군",37.446,126.637],["인천","중구",37.474,126.621],["광주","광산구",35.140,126.793],["광주","남구",35.133,126.903],["광주","동구",35.146,126.923],["광주","북구",35.174,126.912],["광주","서구",35.152,126.889],["대전","대덕구",36.347,127.415],["대전","동구",36.312,127.455],["대전","서구",36.355,127.384],["대전","유성구",36.362,127.356],["대전","중구",36.326,127.421],["울산","남구",35.544,129.330],["울산","동구",35.505,129.417],["울산","북구",35.583,129.361],["울산","울주군",35.522,129.243],["울산","중구",35.569,129.333],["세종","세종시",36.480,127.289],["경기","가평군",37.831,127.510],["경기","고양시",37.658,126.832],["경기","과천시",37.429,126.988],["경기","광명시",37.478,126.865],["경기","광주시",37.429,127.255],["경기","구리시",37.594,127.130],["경기","군포시",37.362,126.935],["경기","김포시",37.615,126.716],["경기","남양주시",37.636,127.217],["경기","동두천시",37.904,127.061],["경기","부천시",37.504,126.766],["경기","성남시",37.420,127.127],["경기","수원시",37.263,127.029],["경기","시흥시",37.380,126.803],["경기","안산시",37.322,126.831],["경기","안성시",37.008,127.280],["경기","안양시",37.394,126.957],["경기","양주시",37.785,127.046],["경기","양평군",37.491,127.488],["경기","여주시",37.298,127.637],["경기","연천군",38.096,127.075],["경기","오산시",37.150,127.077],["경기","용인시",37.241,127.178],["경기","의왕시",37.345,126.968],["경기","의정부시",37.738,127.034],["경기","이천시",37.272,127.435],["경기","파주시",37.760,126.780],["경기","평택시",36.992,127.113],["경기","포천시",37.895,127.200],["경기","하남시",37.539,127.215],["경기","화성시",37.200,126.831],["강원","강릉시",37.752,128.876],["강원","동해시",37.525,129.114],["강원","삼척시",37.450,129.165],["강원","속초시",38.207,128.591],["강원","원주시",37.342,127.920],["강원","춘천시",37.881,127.730],["충북","제천시",37.132,128.191],["충북","청주시",36.642,127.489],["충북","충주시",36.991,127.926],["충남","공주시",36.447,127.119],["충남","논산시",36.187,127.099],["충남","보령시",36.333,126.613],["충남","서산시",36.785,126.450],["충남","아산시",36.790,127.002],["충남","천안시",36.815,127.114],["전북","군산시",35.968,126.737],["전북","남원시",35.416,127.390],["전북","익산시",35.948,126.958],["전북","전주시",35.824,127.148],["전남","광양시",34.940,127.696],["전남","나주시",35.016,126.711],["전남","목포시",34.812,126.392],["전남","순천시",34.951,127.487],["전남","여수시",34.760,127.662],["경북","경주시",35.856,129.225],["경북","구미시",36.120,128.344],["경북","김천시",36.140,128.114],["경북","안동시",36.568,128.730],["경북","영주시",36.806,128.624],["경북","포항시",36.019,129.343],["경남","거제시",34.880,128.621],["경남","김해시",35.229,128.889],["경남","양산시",35.335,129.037],["경남","진주시",35.180,128.107],["경남","창원시",35.228,128.681],["경남","통영시",34.854,128.433],["제주","서귀포시",33.254,126.560],["제주","제주시",33.500,126.531]];
+const SIDO=["서울","부산","대구","인천","광주","대전","울산","세종","경기","강원","충북","충남","전북","전남","경북","경남","제주"];
+const krLabel=r=>r[0]==="세종"?"세종시":r[0]+" "+r[1];
+const DEFAULT_PLACE={key:"37.654,127.056",name:"서울 노원구",kr:true,lat:37.654,lon:127.056};
+const ABROAD=[["도쿄",35.689,139.692],["오사카",34.694,135.502],["파리",48.857,2.352],["런던",51.507,-0.128],["뉴욕",40.713,-74.006]];
+
+/* ---------- clothing reference: 상의 / 하의, broad names ---------- */
+const BANDS = [
+  {min:28, label:"28° 이상", top:["민소매","반팔"], bottom:["반바지","짧은 치마"]},
+  {min:23, label:"23–27°", top:["반팔","얇은 셔츠"], bottom:["반바지","얇은 긴바지","치마"]},
+  {min:20, label:"20–22°", top:["긴팔","얇은 가디건"], bottom:["긴바지","치마"]},
+  {min:17, label:"17–19°", top:["긴팔","니트","바람막이"], bottom:["긴바지","치마"]},
+  {min:12, label:"12–16°", top:["니트","자켓","바람막이"], bottom:["긴바지","치마와 스타킹"]},
+  {min:9, label:"9–11°", top:["니트","트렌치코트","자켓"], bottom:["긴바지","치마와 스타킹"]},
+  {min:5, label:"5–8°", top:["코트","두꺼운 니트"], bottom:["기모 바지","두꺼운 스타킹"]},
+  {min:-99, label:"4° 이하", top:["패딩","두꺼운 코트","목도리"], bottom:["기모 바지","내복"]}
+];
+const LEVELS = [
+  {name:"얇게", desc:"한 겹으로 가볍게"},
+  {name:"가볍게", desc:"얇은 겉옷 하나 걸치기"},
+  {name:"레이어드", desc:"이너 + 가벼운 아우터"},
+  {name:"도톰하게", desc:"니트 + 울 아우터"},
+  {name:"두툼하게", desc:"패딩, 목도리까지 꽁꽁"}
+];
+const bandLevel=[0,0,1,2,2,3,3,4];
+const LV_RANGE=[[35,23],[22,20],[19,12],[11,5],[4,-10]];
+const LV_TEXT=["23° 이상","20–22°","12–19°","5–11°","4° 이하"];
+const LV_ICON=[
+  '<path d="M9 5l-5 3 2 4 2-1v9h8v-9l2 1 2-4-5-3q-3 3-6 0z"/>',
+  '<path d="M9 5l-5 3 1 10h2l1-7v9h8v-9l1 7h2l1-10-5-3"/><path d="M9 5l3 6 3-6M12 11v9"/>',
+  '<path d="M8 4l-4 3 1 12h3V9"/><path d="M16 4l4 3-1 12h-3V9"/><path d="M8 4h8M8 4l4 7 4-7M8 9v12h8V9"/>',
+  '<path d="M8 3l-4 3 1 13h3V8"/><path d="M16 3l4 3-1 13h-3V8"/><path d="M8 3l4 6 4-6M8 8v14h8V8M12 9v13"/>',
+  '<path d="M7 4q5-2 10 0l3 3-1 12h-3l-1-8v11H9V11l-1 8H5L4 7z"/><path d="M8 9h8M8 13h8M8 17h8"/>'
+];
+
+const KIND_KO={sun:"맑음",part:"구름 조금",cloud:"흐림",rain:"비",snow:"눈"};
+
+/* ---------- storage (per-viewer) ---------- */
+const store={
+  get(k,d){try{const v=localStorage.getItem("wth-"+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("wth-"+k,JSON.stringify(v))}catch(e){}}
+};
+const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- icons ---------- */
+function icon(kind,night){
+  const sun='<circle cx="16" cy="16" r="6" fill="#f8d1b8"/><g stroke="#efbfa2" stroke-width="1.6" stroke-linecap="round"><path d="M16 4v3M16 25v3M4 16h3M25 16h3M7.5 7.5l2 2M22.5 22.5l2 2M7.5 24.5l2-2M22.5 9.5l2-2"/></g>';
+  const moon='<path d="M20 6a10 10 0 1 0 6 16A8 8 0 0 1 20 6z" fill="#e6dcc0"/>';
+  const cloud=(x,y,f)=>`<path d="M${x+6} ${y+14}h14a5 5 0 0 0 0-10a7 7 0 0 0-13-1a5 5 0 0 0-1 11z" fill="${f}" stroke="#c9bfc6" stroke-width="1"/>`;
+  let s="";
+  if(kind==="sun") s=night?moon:sun;
+  else if(kind==="part") s=(night?'<path d="M14 5a7 7 0 1 0 4 11A5.5 5.5 0 0 1 14 5z" fill="#e6dcc0"/>':'<circle cx="12" cy="12" r="5.5" fill="#f8d1b8"/>')+cloud(4,10,"#fff");
+  else if(kind==="cloud") s=cloud(1,6,"#eeeaf0")+cloud(5,11,"#fff");
+  else if(kind==="rain") s=cloud(2,3,"#fff")+'<g stroke="#a9c1da" stroke-width="1.8" stroke-linecap="round"><path d="M11 22l-1.5 4M17 22l-1.5 4M23 22l-1.5 4"/></g>';
+  else s=cloud(2,3,"#fff")+'<g fill="#b5c8de"><circle cx="11" cy="24" r="1.6"/><circle cx="17" cy="27" r="1.6"/><circle cx="23" cy="24" r="1.6"/></g>';
+  return `<svg class="ic" viewBox="0 0 32 32" aria-hidden="true">${s}</svg>`;
+}
+
+/* ---------- living weather scene (canvas) ---------- */
+const Sky=(function(){
+  const PAL={
+    sun:{top:"#cfe0ee",bot:"#f8eef0",clouds:2,cloud:"#ffffff",sun:true},
+    part:{top:"#d7e0ea",bot:"#f5eff2",clouds:4,cloud:"#ffffff",sun:true},
+    cloud:{top:"#d9dbe2",bot:"#efedf0",clouds:7,cloud:"#f7f6f8"},
+    rain:{top:"#c6ced8",bot:"#e2e5ea",clouds:7,cloud:"#e9ebef",rain:true},
+    snow:{top:"#dde3ea",bot:"#f6f7f9",clouds:5,cloud:"#ffffff",snow:true}
+  };
+  const NIGHT={top:"#3d4258",bot:"#7d7a91"};
+  const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let cv,ctx,w=0,h=0,cond="sun",night=false,clouds=[],drops=[],flakes=[],stars=[],last=0;
+  const R=(a,b)=>a+Math.random()*(b-a);
+  function seed(){
+    const P=PAL[cond];
+    clouds=Array.from({length:P.clouds},()=>({x:R(-.1,1.1)*w,y:R(.12,.5)*h,s:R(.6,1.15)*h*.11,v:R(4,10)}));
+    drops=P.rain?Array.from({length:80},()=>({x:R(0,w),y:R(0,h),l:R(8,14),v:R(160,240)})):[];
+    flakes=P.snow?Array.from({length:60},()=>({x:R(0,w),y:R(0,h),r:R(1.2,2.8),v:R(14,30),p:R(0,6.28)})):[];
+    stars=Array.from({length:40},()=>({x:R(0,w),y:R(0,h*.6),r:R(.5,1.4),p:R(0,6.28)}));
+  }
+  function size(){
+    if(!cv)return; const r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1); if(!r.width)return;
+    w=r.width;h=r.height;cv.width=Math.round(w*d);cv.height=Math.round(h*d);ctx.setTransform(d,0,0,d,0,0);seed();frame(performance.now(),true);
+  }
+  function blob(x,y,s,col){ctx.fillStyle=col;ctx.beginPath();
+    [[0,0,1],[.9,-.35,.8],[1.7,0,.95],[.85,.25,.9],[-.7,.2,.7],[2.4,.25,.65]].forEach(([dx,dy,k])=>{ctx.moveTo(x+dx*s+k*s,y+dy*s);ctx.arc(x+dx*s,y+dy*s,k*s,0,Math.PI*2);});ctx.fill();}
+  function frame(now,still){
+    if(!ctx||!w)return;
+    const dt=still?0:Math.min(.05,(now-last)/1000);last=now;const P=PAL[cond],t=now/1000;
+    const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,night?NIGHT.top:P.top);g.addColorStop(1,night?NIGHT.bot:P.bot);
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+    if(night&&!P.rain&&cond!=="cloud"){stars.forEach(s=>{ctx.globalAlpha=.4+.4*Math.sin(t*1.5+s.p);ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;}
+    if(P.sun){
+      const sx=w*.72,sy=h*.32;
+      if(night){
+        const mr=h*.1;const gl=ctx.createRadialGradient(sx,sy,mr*.6,sx,sy,mr*2.6);gl.addColorStop(0,"rgba(240,232,210,.35)");gl.addColorStop(1,"rgba(240,232,210,0)");
+        ctx.fillStyle=gl;ctx.beginPath();ctx.arc(sx,sy,mr*2.6,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#efe6cc";ctx.beginPath();ctx.arc(sx,sy,mr,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=NIGHT.top;ctx.beginPath();ctx.arc(sx+mr*.45,sy-mr*.25,mr*.85,0,Math.PI*2);ctx.fill();
+      }else{
+        const sr=h*.12*(1+.03*Math.sin(t*1.2));
+        const gl=ctx.createRadialGradient(sx,sy,sr*.5,sx,sy,sr*3);gl.addColorStop(0,"rgba(255,226,205,.75)");gl.addColorStop(1,"rgba(255,226,205,0)");
+        ctx.fillStyle=gl;ctx.beginPath();ctx.arc(sx,sy,sr*3,0,Math.PI*2);ctx.fill();
+        ctx.save();ctx.translate(sx,sy);ctx.rotate(t*.15);ctx.strokeStyle="rgba(247,206,180,.9)";ctx.lineWidth=2;ctx.lineCap="round";
+        for(let i=0;i<12;i++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(sr*1.35,0);ctx.lineTo(sr*1.75,0);ctx.stroke();}
+        ctx.restore();ctx.fillStyle="#fbd9c2";ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
+      }
+    }
+    clouds.forEach(c=>{c.x+=c.v*dt;if(c.x-c.s>w)c.x=-c.s*3.5;ctx.globalAlpha=night?.55:.92;blob(c.x,c.y,c.s,P.cloud);ctx.globalAlpha=1;});
+    if(P.rain){ctx.strokeStyle=night?"rgba(200,210,230,.6)":"rgba(140,165,195,.7)";ctx.lineWidth=1.3;ctx.lineCap="round";
+      drops.forEach(d=>{d.y+=d.v*dt;d.x-=d.v*dt*.15;if(d.y>h){d.y=-10;d.x=R(0,w*1.1);}ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-d.l*.15,d.y+d.l);ctx.stroke();});}
+    if(P.snow){ctx.fillStyle="rgba(255,255,255,.95)";
+      flakes.forEach(f=>{f.y+=f.v*dt;f.p+=dt;const x=f.x+Math.sin(f.p)*8;if(f.y>h){f.y=-5;f.x=R(0,w);}ctx.beginPath();ctx.arc(x,f.y,f.r,0,Math.PI*2);ctx.fill();});}
+    ctx.fillStyle=night?"rgba(255,255,255,.12)":"rgba(255,255,255,.55)";ctx.beginPath();ctx.moveTo(0,h*.86);ctx.quadraticCurveTo(w*.3,h*.72,w*.62,h*.86);ctx.quadraticCurveTo(w*.85,h*.95,w,h*.82);ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.fill();
+    ctx.fillStyle=night?"rgba(255,255,255,.2)":"rgba(255,255,255,.8)";ctx.beginPath();ctx.moveTo(0,h*.94);ctx.quadraticCurveTo(w*.45,h*.82,w,h*.95);ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.fill();
+  }
+  function loop(n){frame(n,false);requestAnimationFrame(loop);}
+  return{set(c,n){
+    const changed=c!==cond||!!n!==night;cond=PAL[c]?c:"sun";night=!!n;
+    if(!cv){cv=$("sky");ctx=cv.getContext("2d");
+      if(window.ResizeObserver)new ResizeObserver(size).observe(cv);else window.addEventListener("resize",size);
+      size();if(!reduce){last=performance.now();requestAnimationFrame(loop);}}
+    else if(changed){seed();frame(performance.now(),true);}
+  }};
+})();
+/* ---------- Open-Meteo (no key, no sign-up) ---------- */
+const WMO_KO={0:"맑음",1:"대체로 맑음",2:"구름 조금",3:"흐림",45:"안개",48:"서리 안개",51:"약한 이슬비",53:"이슬비",55:"강한 이슬비",56:"어는 이슬비",57:"어는 이슬비",61:"약한 비",63:"비",65:"강한 비",66:"어는 비",67:"강한 어는 비",71:"약한 눈",73:"눈",75:"강한 눈",77:"싸락눈",80:"약한 소나기",81:"소나기",82:"강한 소나기",85:"눈 소나기",86:"강한 눈 소나기",95:"뇌우",96:"우박 동반 뇌우",99:"강한 우박 뇌우"};
+function kindOf(code){
+  code=Number(code);
+  if(code===0||code===1) return "sun";
+  if(code===2) return "part";
+  if(code===3||code===45||code===48) return "cloud";
+  if((code>=71&&code<=77)||code===85||code===86) return "snow";
+  if((code>=51&&code<=67)||(code>=80&&code<=82)||(code>=95&&code<=99)) return "rain";
+  return "part";
+}
+const phraseOf=c=>WMO_KO[c]||KIND_KO[kindOf(c)];
+const uvLabel=v=>v==null?"–":v<3?"낮음":v<6?"보통":v<8?"높음":v<11?"매우 높음":"위험";
+const pmLabel=v=>v==null?"–":v<=15?"좋음":v<=35?"보통":v<=75?"나쁨":"매우 나쁨";
+const windLabel=v=>v==null?"–":v.toFixed(1)+" m/s";
+async function getJSON(url){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),12000);
+  try{ const r=await fetch(url,{signal:ctl.signal}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+  finally{ clearTimeout(t); }
+}
+async function loadWeather(p){
+  const base="https://api.open-meteo.com/v1/forecast?latitude="+p.lat+"&longitude="+p.lon
+   +"&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m"
+   +"&hourly=temperature_2m,weather_code,precipitation_probability,is_day"
+   +"&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_probability_max,uv_index_max"
+   +"&timezone=auto&past_days=1&forecast_days=10&wind_speed_unit=ms";
+  const aqUrl="https://air-quality-api.open-meteo.com/v1/air-quality?latitude="+p.lat+"&longitude="+p.lon+"&current=pm2_5&timezone=auto";
+  const [w,aq]=await Promise.all([getJSON(base), getJSON(aqUrl).catch(()=>null)]);
+  const c=w.current, dl=w.daily, hr=w.hourly;
+  const today=c.time.slice(0,10);
+  const di=dl.time.indexOf(today);            // index of "today" (0 is yesterday because of past_days=1)
+  const hnow=hr.time.indexOf(c.time.slice(0,13)+":00");
+  const cc={temperatureValue:c.temperature_2m, realFeelValue:c.apparent_temperature, code:c.weather_code, isDay:!!c.is_day,
+    humidity:c.relative_humidity_2m, wind:c.wind_speed_10m, uv:dl.uv_index_max[di], pm:aq&&aq.current?aq.current.pm2_5:null};
+  const hours=[];
+  for(let i=hnow+1;i<=hnow+12&&i<hr.time.length;i++) hours.push({h:+hr.time[i].slice(11,13),t:hr.temperature_2m[i],code:hr.weather_code[i],day:!!hr.is_day[i],pp:hr.precipitation_probability[i]||0});
+  const days=[];
+  for(let i=di;i<dl.time.length;i++) days.push({ymd:dl.time[i],hi:dl.temperature_2m_max[i],lo:dl.temperature_2m_min[i],rf:dl.apparent_temperature_max[i],code:dl.weather_code[i],pp:dl.precipitation_probability_max[i]||0});
+  let yday=null;
+  if(di>0){
+    const hh={}; for(let i=0;i<24&&i<hr.time.length;i++){ if(hr.time[i].slice(0,10)===dl.time[di-1]) hh[+hr.time[i].slice(11,13)]=Math.round(hr.temperature_2m[i]); }
+    yday={ymd:dl.time[di-1],hi:Math.round(dl.temperature_2m_max[di-1]),lo:Math.round(dl.temperature_2m_min[di-1]),code:dl.weather_code[di-1],rain:dl.precipitation_probability_max[di-1],hours:hh};
+  }
+  return {tz:w.timezone||"Asia/Seoul", cc, hours, days, yday, now:{ymd:today,h:+c.time.slice(11,13),min:+c.time.slice(14,16)}};
+}
+
+/* ---------- state ---------- */
+let place = store.get("place", DEFAULT_PLACE);
+let saved = store.get("saved", [DEFAULT_PLACE]);
+const D = {w:null, updatedAt:null, err:null, loading:false};
+let dayIdx = 0, loadSeq = 0, refreshTimer = 0;
+const WD=["일","월","화","수","목","금","토"];
+const wdOf=ymd=>WD[new Date(ymd+"T12:00:00Z").getUTCDay()];
+const addDays=(ymd,n)=>{const d=new Date(ymd+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+const pad=n=>String(n).padStart(2,"0");
+function showBanner(html){ const b=$("banner"); if(html){ b.innerHTML=html; b.hidden=false; } else b.hidden=true; }
+
+async function refresh(){
+  const seq=++loadSeq, p=place;
+  D.loading=true; renderHome();
+  try{
+    const w=await loadWeather(p);
+    if(seq!==loadSeq) return;
+    D.w=w; D.err=null; D.updatedAt=Date.now(); D.loading=false; showBanner(null);
+  }catch(e){
+    if(seq!==loadSeq) return;
+    D.loading=false; D.err=(e&&e.name==="AbortError")?"timeout":"fail";
+    showBanner(D.w?"<b>최신 날씨를 받아오지 못했어요.</b> 마지막으로 받은 날씨를 보여드리고 있어요. 잠시 뒤 다시 시도해요."
+                  :"<b>날씨를 불러오지 못했어요.</b> 인터넷 연결을 확인하고 새로 고쳐 주세요.");
+  }
+  render();
+  clearTimeout(refreshTimer); refreshTimer=setTimeout(refresh,D.err?60000:600000);
+}
+
+/* ---------- render ---------- */
+function render(){ renderHome(); if(!$("view-cody").hidden) renderCody(); }
+const chev='<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke-linecap="round"/></svg>';
+const shortName=()=>place.kr?place.name:place.name.split(",")[0];
+
+function renderHome(){
+  const w=D.w, cc=w&&w.cc;
+  if(!cc){
+    $("locBtn").innerHTML=`<b>—</b><span>${esc(shortName())}</span>${chev}`;
+    $("place").innerHTML=`<b>${esc(place.name)}</b>`;
+    $("heroTemp").innerHTML="—"; $("heroCond").textContent = D.err ? "날씨를 불러올 수 없어요" : "날씨를 불러오는 중이에요";
+    $("heroStats").innerHTML=""; $("sceneTag").textContent="";
+    Sky.set("part",false);
+    $("status").innerHTML="";
+    $("hourly").innerHTML=`<p class="skeleton">${D.err?"시간별 예보를 불러오지 못했어요":"시간별 예보를 불러오는 중이에요"}</p>`;
+    $("week").innerHTML=`<p class="skeleton">${D.err?"주간 예보를 불러오지 못했어요":"주간 예보를 불러오는 중이에요"}</p>`;
+    $("yday").innerHTML="";
+    return;
+  }
+  const now=w.now, kind=kindOf(cc.code), night=!cc.isDay;
+  const t=Math.round(cc.temperatureValue), rf=Math.round(cc.realFeelValue), f0=w.days[0];
+  $("locBtn").innerHTML = icon(kind,night)+`<b class="num">${t}°</b><span>${esc(shortName())}</span>${chev}`;
+  $("place").innerHTML = `<b>${esc(place.name)}</b> · 현지 ${+now.ymd.slice(5,7)}월 ${+now.ymd.slice(8,10)}일 (${wdOf(now.ymd)}) ${pad(now.h)}:${pad(now.min)}`;
+  $("sceneTag").textContent = `${phraseOf(cc.code)} · ${t}°`;
+  Sky.set(kind,night);
+  $("heroTemp").innerHTML = `${t}<sup>°</sup>`;
+  $("heroCond").innerHTML = `${esc(phraseOf(cc.code))} · 체감 <b class="num">${rf}°</b>`+(f0?` · 최고 ${Math.round(f0.hi)}° / 최저 ${Math.round(f0.lo)}°`:"");
+  $("heroStats").innerHTML = [["습도",cc.humidity!=null?Math.round(cc.humidity)+"%":"–"],["바람",windLabel(cc.wind)],["자외선",uvLabel(cc.uv)],["대기질",pmLabel(cc.pm)]]
+    .map(([k,v])=>`<div class="stat"><span>${k}</span><b class="num">${esc(v)}</b></div>`).join("");
+  const age = D.updatedAt ? Math.max(0,Math.round((Date.now()-D.updatedAt)/60000)) : null;
+  $("status").innerHTML = `<span class="live${D.err?" stale":""}"><i></i>${D.err?"마지막으로 받은 날씨":"실시간"}</span> · ${age==null?"":age<1?"방금 업데이트":age+"분 전 업데이트"}`;
+  // hourly
+  $("hourly").innerHTML = `<div class="hour now"><span>지금</span>${icon(kind,night)}<b class="num">${t}°</b><span class="pp"></span></div>`
+    + w.hours.map(x=>`<div class="hour"><span>${x.h}시</span>${icon(kindOf(x.code),!x.day)}<b class="num">${Math.round(x.t)}°</b><span class="pp num">${x.pp>=30?x.pp+"%":""}</span></div>`).join("");
+  // week
+  const wk=w.days.slice(0,10).map(d=>({hi:Math.round(d.hi),lo:Math.round(d.lo),code:d.code,pp:d.pp,ymd:d.ymd}));
+  const lo=Math.min(...wk.map(d=>d.lo)), hi=Math.max(...wk.map(d=>d.hi)), span=Math.max(1,hi-lo);
+  $("week").innerHTML = wk.map((d,i)=>`<button class="day" data-i="${i}" aria-pressed="${i===dayIdx}">
+    <span><b style="font-weight:500">${i===0?"오늘":wdOf(d.ymd)}</b> <span class="muted num" style="font-size:12px">${+d.ymd.slice(5,7)}/${+d.ymd.slice(8,10)}</span></span>
+    ${icon(kindOf(d.code))}
+    <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><div class="t num"><span class="muted">${d.lo}°</span><span>${d.hi}°</span></div><div class="range"><i style="left:${(d.lo-lo)/span*100}%;right:${(hi-d.hi)/span*100}%"></i></div></div>
+    <span class="pp num">${d.pp>=30?d.pp+"%":""}</span></button>`).join("");
+  renderYesterday();
+}
+
+function renderYesterday(){
+  const w=D.w, y=w&&w.yday, f0=w&&w.days[0], cc=w&&w.cc;
+  if(!y||!f0){ $("yday").innerHTML=`<div class="y-tip">이 지역의 어제 날씨를 가져오지 못했어요.</div>`; return; }
+  const diff=v=>({txt:(v>0?"+":"")+v+"°",cls:v>0?"up":v<0?"down":""});
+  const tHi=Math.round(f0.hi), tLo=Math.round(f0.lo), yNow=y.hours[w.now.h];
+  const cells=[["지금 시각",yNow!=null?diff(Math.round(cc.temperatureValue)-yNow):null],["최고 기온",diff(tHi-y.hi)],["최저 기온",diff(tLo-y.lo)]];
+  const vals=cells.filter(c=>c[1]).map(c=>parseInt(c[1].txt));
+  const avg=vals.reduce((a,b)=>a+b,0)/Math.max(1,vals.length);
+  const tip= avg>=3?"어제보다 확실히 따뜻해요. 어제 입은 옷에서 한 겹 덜어내세요.":avg<=-3?"어제보다 쌀쌀해요. 어제 옷차림에 한 겹 더 챙기세요.":"어제와 기온이 비슷해요. 어제처럼 입어도 괜찮아요.";
+  const hrs=Object.keys(y.hours).map(Number).sort((a,b)=>a-b).filter(h=>h%3===0);
+  $("yday").innerHTML = `<div class="y-top">${icon(kindOf(y.code))}<div><b>${esc(phraseOf(y.code))}</b><small class="num">어제 ${+y.ymd.slice(5,7)}/${+y.ymd.slice(8,10)} (${wdOf(y.ymd)})${y.rain!=null?` · 강수 ${y.rain}%`:""}</small></div><div class="y-temp num"><span>${y.lo}°</span>${y.hi}°</div></div>
+    <div class="y-cmp">${cells.map(([k,v])=>`<div><span>${k}</span><b class="num ${v?v.cls:""}">${v?v.txt:"–"}</b></div>`).join("")}</div>
+    ${hrs.length?`<div class="y-hours">${hrs.map(h=>`<div><span>${h}시</span><b class="num">${y.hours[h]}°</b></div>`).join("")}</div>`:""}
+    <div class="y-tip">${tip}</div>`;
+}
+
+function bandOf(t){for(let i=0;i<BANDS.length;i++){if(t>=BANDS[i].min)return i;}return 7;}
+function renderCody(){
+  const w=D.w;
+  if(!w){ $("tHead").innerHTML=`<p class="skeleton">날씨를 불러오면 두께감을 알려드려요</p>`; $("tMeter").innerHTML=""; $("tNote").innerHTML=""; $("chartBasis").textContent=""; renderChart(-1); return; }
+  const cc=w.cc, f=w.days[Math.min(dayIdx,w.days.length-1)], isToday=dayIdx===0;
+  const hi=Math.round(f.hi), lo=Math.round(f.lo);
+  const t = isToday ? Math.round(cc.temperatureValue) : Math.round((lo+hi*2)/3);
+  const rf = isToday ? Math.round(cc.realFeelValue) : Math.round(f.rf);
+  const band=bandOf(t), lvl=bandLevel[band], range=hi-lo, wet=["rain","snow"].includes(kindOf(f.code))||f.pp>=50;
+  const dLabel = isToday ? "지금 기온" : `${+f.ymd.slice(5,7)}/${+f.ymd.slice(8,10)} 낮 기준`;
+  $("tHead").innerHTML = `<div class="t-num"><b>${lvl+1}</b><span>/ 5단계</span></div><div><div class="t-name">${LEVELS[lvl].name}</div><div class="t-desc">${LEVELS[lvl].desc} · ${esc(shortName())} ${dLabel} <span class="num">${t}°</span> (체감 ${rf}°)</div></div>`;
+  const [rh,rl]=LV_RANGE[lvl], frac=Math.max(.08,Math.min(.92,(rh-t)/Math.max(1,rh-rl)));
+  $("tMeter").innerHTML = `<div class="t-pin" style="left:${(lvl+frac)/5*100}%"><span class="num">${t}°</span><i></i></div>`
+    + LEVELS.map((l,i)=>`<div class="t-seg" style="background:${i===lvl?"var(--accent)":"var(--lv"+(i+1)+")"}"></div>`).join("")
+    + LEVELS.map((l,i)=>`<div class="t-tile${i===lvl?" on":""}" style="${i===lvl?"":"background:var(--lv"+(i+1)+")"}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">${LV_ICON[i]}</svg><b>${l.name}</b><small class="num">${LV_TEXT[i]}</small></div>`).join("");
+  $("tNote").innerHTML = (range>=10 ? `일교차가 <b class="num">${range}°</b>로 커요. 아침저녁엔 한 단계 두껍게, 낮엔 벗을 수 있게 입으세요.` : `하루 종일 기온 차이가 크지 않아요. <b>${LEVELS[lvl].name}</b> 그대로 입으면 돼요.`)
+    + (wet ? ` 비 소식(${f.pp}%)이 있으니 젖어도 괜찮은 신발과 우산을 챙기세요.` : "");
+  $("chartBasis").textContent = `${shortName()} · ${t}° 기준`;
+  renderChart(band);
+}
+function renderChart(band){
+  const line=(k,arr)=>`<div><span class="k">${k}</span><div class="wear">${arr.map(w=>`<span>${w}</span>`).join("")}</div></div>`;
+  $("chart").innerHTML = BANDS.map((b,i)=>`<div class="band${i===band?" cur":""}"><b class="num">${b.label}</b><div class="band-rows">${line("상의",b.top)}${line("하의",b.bottom)}</div></div>`).join("");
+}
+
+/* ---------- place picker: Korean districts first ---------- */
+let searchTimer=0, searchSeq=0, openSido=null;
+const HANGUL=/[가-힣]/;
+function krMatches(q){
+  const n=q.replace(/\s+/g,"");
+  if(!n) return [];
+  const strip=g=>g.replace(/(구|시|군)$/,"");
+  return KR.filter(r=>{
+    const full=(r[0]+r[1]).replace(/\s+/g,"");
+    return full.includes(n) || r[1].includes(n) || strip(r[1]).startsWith(n) || (n.length>=2 && r[0].startsWith(n)) || r[0]===n;
+  });
+}
+const pkey=(lat,lon)=>(+lat).toFixed(3)+","+(+lon).toFixed(3);
+function krButton(r){ return `<button class="city" role="option" data-lat="${r[2]}" data-lon="${r[3]}" data-name="${esc(krLabel(r))}" data-kr="1" aria-selected="${place.key===pkey(r[2],r[3])}"><span>${esc(krLabel(r))}</span><small>대한민국</small></button>`; }
+const chipOn=' style="background:var(--blush-2);color:var(--ink)"';
+function renderSaved(){
+  $("recent").innerHTML = saved.map(p=>`<button class="chip" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${esc(p.name)}"${p.kr?' data-kr="1"':""}${p.key===place.key?chipOn:""}>${esc(p.name.split(",")[0])}</button>`).join("") || `<p class="empty">아직 저장한 지역이 없어요</p>`;
+  $("sido").innerHTML = SIDO.map(s=>`<button class="chip" data-sido="${s}"${s===openSido?chipOn:""}>${s}</button>`).join("");
+  $("gu").innerHTML = openSido ? KR.filter(r=>r[0]===openSido).map(r=>`<button class="chip" data-lat="${r[2]}" data-lon="${r[3]}" data-name="${esc(krLabel(r))}" data-kr="1">${esc(r[1])}</button>`).join("") : "";
+  $("quick").innerHTML = ABROAD.map(([l,la,lo])=>`<button class="chip" data-lat="${la}" data-lon="${lo}" data-name="${esc(l)}">${esc(l)}</button>`).join("");
+}
+function geoLabel(x){
+  const parts=[x.name]; [x.admin2,x.admin1].forEach(a=>{ if(a&&!parts.includes(a)) parts.push(a); });
+  if(x.country_code!=="KR"&&x.country) parts.push(x.country);
+  return parts.join(", ");
+}
+async function runSearch(q){
+  const seq=++searchSeq;
+  if(!q){ $("list").innerHTML=""; return null; }
+  let local=[];
+  if(HANGUL.test(q)) local=krMatches(q);                         // Korean districts answer instantly, no network
+  const head = local.length ? `<div class="grp">대한민국</div>`+local.slice(0,30).map(krButton).join("") : "";
+  const shown = local.slice(0,30).map(r=>({lat:r[2],lon:r[3],name:krLabel(r),kr:true}));
+  if(local.length>=3){ $("list").innerHTML=head; return shown; }  // enough: skip the network
+  $("list").innerHTML=head+`<p class="empty">'${esc(q)}' 찾는 중…</p>`;
+  try{
+    const r=await getJSON("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=12&language=ko&format=json");
+    if(seq!==searchSeq) return null;
+    let res=(r.results||[]).slice();
+    res.sort((a,b)=>(b.country_code==="KR")-(a.country_code==="KR"));   // Korean places first
+    const have=new Set(shown.map(s=>pkey(s.lat,s.lon)));
+    res=res.filter(x=>!have.has(pkey(x.latitude,x.longitude)));
+    const body = res.length ? `<div class="grp">검색 결과</div>`+res.map(x=>`<button class="city" role="option" data-lat="${x.latitude}" data-lon="${x.longitude}" data-name="${esc(geoLabel(x))}"${x.country_code==="KR"?' data-kr="1"':""}><span>${esc(geoLabel(x))}</span><small>${x.country_code==="KR"?"대한민국":esc(x.country||"해외")}</small></button>`).join("")
+      : (local.length?"":`<p class="empty">'${esc(q)}'에 맞는 지역을 찾지 못했어요. 구 이름(예: 노원구, 해운대구)이나 시 이름으로 찾아보세요.</p>`);
+    $("list").innerHTML=head+body;
+    return shown.concat(res.map(x=>({lat:x.latitude,lon:x.longitude,name:geoLabel(x),kr:x.country_code==="KR"})));
+  }catch(e){
+    if(seq!==searchSeq) return null;
+    $("list").innerHTML=head+`<p class="empty">지역 검색을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>`;
+    return shown.length?shown:null;
+  }
+}
+function openPicker(open){
+  $("picker").hidden=!open; $("locBtn").setAttribute("aria-expanded",open);
+  if(open){ if(!openSido) openSido=(place.kr&&place.name.split(" ")[0])||"서울"; if(!SIDO.includes(openSido)) openSido="서울"; renderSaved(); setTimeout(()=>$("q").focus(),0); }
+}
+function choose(lat,lon,name,kr){
+  lat=+lat; lon=+lon; if(!isFinite(lat)||!isFinite(lon)) return;
+  place={key:pkey(lat,lon),name,kr:!!kr,lat,lon};
+  saved=[place,...saved.filter(p=>p.key!==place.key)].slice(0,8);
+  store.set("place",place); store.set("saved",saved);
+  D.w=null; D.err=null; dayIdx=0; showBanner(null);
+  openPicker(false); $("q").value=""; $("list").innerHTML="";
+  render(); refresh();
+}
+$("locBtn").addEventListener("click",()=>openPicker($("picker").hidden));
+$("q").addEventListener("input",()=>{ clearTimeout(searchTimer); const q=$("q").value.trim(); searchTimer=setTimeout(()=>runSearch(q), HANGUL.test(q)?60:400); });
+$("searchForm").addEventListener("submit",async e=>{ e.preventDefault(); clearTimeout(searchTimer); const res=await runSearch($("q").value.trim()); if(res&&res.length===1) choose(res[0].lat,res[0].lon,res[0].name,res[0].kr); });
+$("q").addEventListener("keydown",e=>{ if(e.key==="Escape") openPicker(false); });
+$("picker").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.sido){ openSido=b.dataset.sido; renderSaved(); return; }
+  if(b.dataset.lat) choose(b.dataset.lat,b.dataset.lon,b.dataset.name,b.dataset.kr==="1");
+});
+document.addEventListener("click",e=>{ if(!$("picker").hidden && !e.target.closest("#picker") && !e.target.closest("#locBtn")) openPicker(false); });
+
+// anything saved by an older version (no coordinates) is dropped
+(function migrate(){
+  const ok=p=>p&&isFinite(p.lat)&&isFinite(p.lon);
+  if(!ok(place)) place=DEFAULT_PLACE;
+  saved=saved.filter(ok); if(!saved.length) saved=[DEFAULT_PLACE];
+  store.set("place",place); store.set("saved",saved);
+})();
+
+/* ---------- tabs ---------- */
+const TABS=["now","cody"];
+function show(tab){
+  if(!TABS.includes(tab)) tab="now";
+  TABS.forEach(t=>{ $("view-"+t).hidden=t!==tab; $("tab-"+t).setAttribute("aria-selected",t===tab); });
+  store.set("tab",tab);
+  if(tab==="cody") renderCody();
+  window.scrollTo(0,0);
+}
+document.querySelector(".tabbar").addEventListener("click",e=>{const b=e.target.closest(".tb"); if(b) show(b.dataset.tab);});
+$("week").addEventListener("click",e=>{const b=e.target.closest(".day"); if(!b) return; dayIdx=Number(b.dataset.i); renderHome(); show("cody");});
+
+/* ---------- boot ---------- */
+render();
+show(store.get("tab","now"));
+refresh();
+setInterval(()=>{ if(D.w) renderHome(); },30000);                       // keep the local clock and "updated" age fresh
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) return; if(D.updatedAt && Date.now()-D.updatedAt>300000) refresh(); });
+
+})();
+</script>
+</body>
+</html>
